@@ -14,9 +14,25 @@ Webhooks let your own systems hear about new leads and waitlist signups as they 
 
 A webhook listens to both events by default. You can pick just one when you register it.
 
-You'll need an API token (see [Authentication](/api-documentation/endpoint/user/login)) for a user who can edit the project: the owner, an administrator or an editor.
+## From the dashboard
+
+You don't need the API to manage webhooks. Open your project, go to **Settings**, then the **Integrations** tab, and scroll down to **Webhooks**.
+
+From there you can:
+
+- Add a webhook: paste your URL and pick which events it should get.
+- See how each one is doing: when the last delivery went through, or why the last one failed.
+- **Send test** to check your server answers.
+- **Pause** a webhook and **Resume** it later.
+- **Delete** it.
+
+When you add a webhook, its secret shows up once, right there. Copy it and click **Done**: you can't add another webhook until you do, so the secret doesn't get lost by accident.
+
+The same rules as the API apply: you need to be able to edit the project, each project can have up to 10 webhooks, and the URL has to follow the [rules below](#register-a-webhook).
 
 ## Register a webhook
+
+You'll need an API token (see [Authentication](/api-documentation/endpoint/user/login)) for a user who can edit the project: the owner, an administrator or an editor.
 
 Send a `POST` to your project's webhooks endpoint with your API token:
 
@@ -183,7 +199,7 @@ curl "https://app.planpoint.io/api/projects/PROJECT_ID/webhooks" \
   -H "Authorization: Bearer YOUR_API_TOKEN"
 ```
 
-Each webhook comes with its delivery status (`lastStatus`, `lastError`, `lastDeliveryAt`, `failureCount`). The secret is never shown again, only its last 4 characters in `secretHint`, so you can tell them apart.
+Each webhook comes with its delivery status (`lastStatus`, `lastError`, `lastDeliveryAt`, `failureCount`). `lastError` stays there after a later delivery works, so go by `failureCount` to tell whether a webhook is healthy. The secret is never shown again, only its last 4 characters in `secretHint`, so you can tell them apart.
 
 ### Send a test
 
@@ -195,10 +211,27 @@ curl -X POST "https://app.planpoint.io/api/projects/PROJECT_ID/webhooks/WEBHOOK_
 We send a signed `webhook.test` event to your URL right away and tell you how it went:
 
 ```json
-{ "ok": true, "status": 200, "error": null }
+{
+  "ok": true,
+  "status": 200,
+  "error": null,
+  "webhook": {
+    "_id": "6721f0c2a1b2c3d4e5f61102",
+    "url": "https://your-server.com/planpoint-webhook",
+    "events": ["lead.created", "waitlist.created"],
+    "active": true,
+    "failureCount": 0,
+    "lastDeliveryAt": "2026-11-04T13:50:00.000Z",
+    "lastStatus": 200,
+    "createdAt": "2026-11-04T13:45:00.000Z",
+    "secretHint": "…9f3a"
+  }
+}
 ```
 
-It's the quickest way to check your URL and your signature code before real leads come in. Test events aren't retried.
+`webhook` is the webhook as it is right after the test, with its delivery status updated. Like everywhere else, it never includes the secret.
+
+It's the quickest way to check your URL and your signature code before real leads come in. Test events aren't retried. A failed test does count toward the [automatic pause](#automatic-pause), and a successful one resets the count.
 
 ### Pause or turn it back on
 
@@ -210,6 +243,8 @@ curl -X PATCH "https://app.planpoint.io/api/projects/PROJECT_ID/webhooks/WEBHOOK
 ```
 
 Send `{ "active": true }` to turn it back on.
+
+The response is `{ "webhook": { ... } }`, with the webhook in the same shape as in the list.
 
 ### Delete it
 
